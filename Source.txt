@@ -1,0 +1,2 @@
+Rout	Colatitude_min	Colatitude_max	rc	Rad_min	Rad_max	Alfven_radius	Polar_cap_rad	Th_height
+200	0	14.8491	10	1e+06	1.00039e+06	1.52261e+07	256275	1.83675

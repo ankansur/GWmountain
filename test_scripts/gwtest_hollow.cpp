@@ -6,12 +6,6 @@
 //   Version: 3.0 (working version)
 //   Date: April 2021
 //  
-//
-//   Equation: GS A = -r**2*sin(theta)*(electron denisty) + Beta*d(Beta)/dA
-//               B = strength * (A - A(R,theta))**(power)
-//              
-//   The code requires you to put an input strength, power, and threshold error
-//          
 //   Author: Ankan Sur
 //   Affiliation: Nicolaus Copernicus Astronomical Center, Warsaw, Poland
 //
@@ -28,15 +22,14 @@
 using namespace std;
 
 
-
 int main() {
 
 
-    int Nr = 32;
-    int Nu = 32;
+    int Nr = 128;
+    int Nu = 128;
     double u[Nu], x[Nr],r[Nr];
     double rc = 0.04*100.0; //(convert m to cm)
-    double rout = 40*rc; //convert into cm
+    double rout = 100*rc; //convert into cm
     double Rs = 1e6;
     double R = 20*rc;
     double Mdot = 6e-13;
@@ -45,17 +38,18 @@ int main() {
     double M = 1.4*1.989e33;
     double G = 6.67e-8;
     double cs = 1e8;
-    double x0 = R;//pow(cs*Rs,2)/G/M;
+    double x0 = R;
     double a = Rs/R;
     double u_in = 1.0;
     double u_out = sqrt(1-Rs/rA);
     double du = (u_out-u_in)/(Nu-1);
     double dr1 = rc/(Nr/2.0);
     double dr2 = (rout-rc)/(Nr/2.0 -1);
+    double dr = rout/(Nr-1);
     int i,j;
     double A[Nr][Nu],Ac[Nr][Nu],S[Nr][Nu],rho[Nr][Nu],Q[Nr][Nu];
-    int error = 1.0;
-    double den,Qp,Qc,Source,w,max1,min1,counter,threshold,dAdr,dAdu,ncounter;
+    double e = 100.0;
+    double den,Qp,Qc,Source,w,max1,min1,counter,threshold,dAdr,dAdu,ncounter,diffr;
     int rid,uid;
     ofstream outputfile1,outputfile2,outputfile3,outputfile4;
     double Pi = atan(1)*4;
@@ -64,6 +58,7 @@ int main() {
     double Kappa = 5.4e9;
     double f,r0,t1,t2,sinthp,PsiA;
     double Rp = pow(Rs/rA,0.5)*Rs;
+    double dx;
     
     //required input parameters
     cout<<"enter threshold =";
@@ -71,9 +66,6 @@ int main() {
 
     //extra parameters
     counter=0;
-    
-    cout<<"enter the maximum number of iterations= ";
-    cin>>ncounter;
 
     sinthp = sin(Rp/Rs);
     
@@ -97,7 +89,11 @@ int main() {
         x[i] = (r[i]-Rs)/R;
         }
 
-    double dx = x[2]-x[1];
+    /*for (int i=0; i<Nr; i++){ 
+        r[i] = (i*dr+Rs);
+        x[i] = (r[i]-Rs)/R;
+        }*/
+
     
     outputfile4.open("Source.txt");
     /*
@@ -125,12 +121,12 @@ int main() {
    
    // set boundaries
     for (i=0;i<Nr;i++){
-         A[i][0] = 0.0;//rA*(1-pow(u[Nu-1],2))/(x[i]+a)/x0;
-         A[i][Nu-1] = Rs*Rs*Rs*(1-pow(u[Nu-1],2))/Rp/Rp/r[i]; //rA*(1-pow(u[Nu-1],2))/(x[i]+a)/x0;
+         A[i][0] = 0.0;
+         A[i][Nu-1] = Rs*Rs*Rs*(1-pow(u[Nu-1],2))/Rp/Rp/r[i]; 
          }
     for (j=0;j<Nu;j++){
-        A[0][j] =  Rs*Rs*(1-pow(u[j],2))/Rp/Rp; //rA*(1-pow(u[j],2))/(x[0]+a)/x0;
-        A[Nr-1][j] = Rs*Rs*Rs*(1-pow(u[j],2))/Rp/Rp/r[Nr-1]; //rA*(1-pow(u[j],2))/(x[Nr-1]+a)/x0;
+        A[0][j] =  Rs*Rs*(1-pow(u[j],2))/Rp/Rp; 
+        A[Nr-1][j] = Rs*Rs*Rs*(1-pow(u[j],2))/Rp/Rp/r[Nr-1]; 
     }
     
     outputfile3.open("A0.txt");
@@ -146,26 +142,24 @@ int main() {
  
     auto t_start = std::chrono::high_resolution_clock::now();
 
-    while (counter<ncounter){
+    while (e>threshold){
 
 
     std::copy(&A[0][0], &A[0][0]+Nr*Nu,&Ac[0][0]);
 
     for (i=1;i<Nr-1;i++){
+        dx = x[i+1]-x[i];
         for (j=1;j<Nu-1;j++){
-            //r0 = Rs + rc*(1-A[i][j]);
-            //cout<<r0<<"\t";
-            if ((rc-rc*A[i][j]*A[i][j]-i*dr1)>0.0){
-            //if ((rc-rc*A[i][j]-i*dr1)>0){
-                rho[i][j] = pow(g*2.0/5.0/Kappa,1.5)*pow(rc-rc*A[i][j]*A[i][j]-i*dr1,1.5);
-                Q[i][j] = 32.0*Pi*pow(R,4)*pow(x[i]+a,2)*(1.0-u[j]*u[j])*rho[i][j]*g*rc/pow(Bs*Rp*Rp,2);
+            diffr = Rs + rc*(1.0-4.0*A[i][j]*A[i][j])-r[i];
+            if (diffr>0.0){
+                rho[i][j] = pow(g*2.0/5.0/Kappa,1.5)*pow(diffr,1.5);
+                Q[i][j] = 64.0*Pi*pow(R,4)*pow(x[i]+a,2)*(1.0-u[j]*u[j])*rho[i][j]*g*rc/pow(Bs*Rp*Rp,2);
                 }
             else{ 
                 rho[i][j] = 0.0;
                 Q[i][j] = 0.0;
                 }
             den = (2.0/dx/dx + 2.0*(1-u[j]*u[j])/pow(x[i]+a,2.0)/du/du + Q[i][j]);
-            //Source = Q[i][j] - Qp*Ac[i][j] + std::max(0.0,Qp)*Ac[i][j];
             A[i][j] = (1-w)*Ac[i][j] + w*((A[i+1][j]+A[i-1][j])/dx/dx + (1-u[j]*u[j])*(A[i][j+1]+A[i][j-1])/pow(x[i]+a,2)/du/du)/den;
        }
     }
@@ -203,7 +197,7 @@ int main() {
         {
             for (int index= 0; index < Nu; index++)
                
-                outputfile2<<A[count][index]<<" ";  
+                outputfile2<<(A[count][index]+0.5)<<" ";  
             outputfile2<<endl;                          
         }
     outputfile2.close(); 
@@ -221,7 +215,7 @@ int main() {
    
    auto t_end = std::chrono::high_resolution_clock::now();
    double elapsed_time_ms = std::chrono::duration<double, std::milli>(t_end-t_start).count();
-   cout<<"time elapsed = "<<elapsed_time_ms/1000.0;
+   cout<<"time elapsed = "<<elapsed_time_ms/1000.0<<"\n";
    
     return 0;
 }

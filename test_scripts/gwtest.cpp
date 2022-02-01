@@ -1,16 +1,21 @@
-//==========================================================================================
+//========================================================================================================================================
 //
-//   Description: A C++ program to obtain magnetic mounds (solid mound)
+//   Description: A C++ program to solve the Grad-Shafranov equation to find equilibria models
 //                                  
 //   
-//   Version: 1.0 (working version)
+//   Version: 3.0 (working version)
 //   Date: April 2021
 //  
+//
+//   Equation: GS A = -r**2*sin(theta)*(electron denisty) + Beta*d(Beta)/dA
+//               B = strength * (A - A(R,theta))**(power)
+//              
+//   The code requires you to put an input strength, power, and threshold error
 //          
 //   Author: Ankan Sur
 //   Affiliation: Nicolaus Copernicus Astronomical Center, Warsaw, Poland
 //
-//==========================================================================================
+//========================================================================================================================================
 
 
 #include <iostream>
@@ -23,13 +28,15 @@
 using namespace std;
 
 
+
 int main() {
 
-    int Nr = 101;
-    int Nu = 101;
+
+    int Nr = 128;
+    int Nu = 128;
     double u[Nu], x[Nr],r[Nr];
-    double rc = 0.1*100.0; //(convert m to cm)
-    double rout = 20*rc; //convert into cm
+    double rc = 0.04*100.0; //(convert m to cm)
+    double rout = 40*rc; //convert into cm
     double Rs = 1e6;
     double R = 20*rc;
     double Mdot = 6e-13;
@@ -47,7 +54,7 @@ int main() {
     double dr2 = (rout-rc)/(Nr/2.0 -1);
     int i,j;
     double A[Nr][Nu],Ac[Nr][Nu],S[Nr][Nu],rho[Nr][Nu],Q[Nr][Nu];
-    double e = 100.0;
+    int error = 1.0;
     double den,Qp,Qc,Source,w,max1,min1,counter,threshold,dAdr,dAdu,ncounter;
     int rid,uid;
     ofstream outputfile1,outputfile2,outputfile3,outputfile4;
@@ -57,7 +64,6 @@ int main() {
     double Kappa = 5.4e9;
     double f,r0,t1,t2,sinthp,PsiA;
     double Rp = pow(Rs/rA,0.5)*Rs;
-    double diffr;
     
     //required input parameters
     cout<<"enter threshold =";
@@ -65,11 +71,14 @@ int main() {
 
     //extra parameters
     counter=0;
+    
+    cout<<"enter the maximum number of iterations= ";
+    cin>>ncounter;
 
     sinthp = sin(Rp/Rs);
     
     //under-relaxation parameter
-    w = 0.9;
+    w = 0.1;
     
     // initialize grid
     for (int j=0; j<Nu; j++){ 
@@ -88,9 +97,20 @@ int main() {
         x[i] = (r[i]-Rs)/R;
         }
 
-    double dx;
+    double dx = x[2]-x[1];
     
     outputfile4.open("Source.txt");
+    /*
+    outputfile4<<"Domain above star = "<<rout/100.0<<" m\n";
+    outputfile4<<"printing colatitude range = "<<acos(u[0])*180/Pi<<" to "<<acos(u[Nu-1])*180/Pi<<" degrees"<<"\n";
+    outputfile4<<"printing radial range = "<<r[0]<<" to "<<r[Nr-1]<<" cm"<<"\n";
+    outputfile4<<"printing x range = "<<x[0]<<" to "<<x[Nr-1]<<"\n"; 
+    outputfile4<<"printing a = "<<a<<"\n";
+    outputfile4<<"printing x0 = "<<x0<<" cm\n";
+    outputfile4<<"Alfven radius = "<<rA/1e5<<" km \n";
+    outputfile4<<"Polar cap radius = "<<Rp/1e5<<" km \n";
+    outputfile4<<"Threshold height = "<<54*pow(Bs/1e12,0.41)*pow(Rp/1e5,0.42)<<" m \n";
+    */
     outputfile4<<"Rout\tColatitude_min\tColatitude_max\trc\tRad_min\tRad_max\tAlfven_radius\tPolar_cap_rad\tTh_height\n";
     outputfile4<<rout<<"\t"<<acos(u[0])*180/Pi<<"\t"<<acos(u[Nu-1])*180/Pi<<"\t"<<rc<<"\t"<<r[0]<<"\t"<<r[Nr-1]<<"\t"<<rA<<"\t"<<Rp<<"\t"<<54*pow(Bs/1e12,0.41)*pow(Rp/1e5,0.42)<<"\n";
     outputfile4.close();
@@ -126,21 +146,18 @@ int main() {
  
     auto t_start = std::chrono::high_resolution_clock::now();
 
-    while (e>threshold){
+    while (counter<ncounter){
 
 
     std::copy(&A[0][0], &A[0][0]+Nr*Nu,&Ac[0][0]);
 
     for (i=1;i<Nr-1;i++){
-        dx = x[i+1]-x[i];
         for (j=1;j<Nu-1;j++){
             //r0 = Rs + rc*(1-A[i][j]);
             //cout<<r0<<"\t";
-            diffr = Rs + rc*(1.0 - A[i][j]*A[i][j])-r[i];
-            //diffr = rc-rc*A[i][j]*A[i][j]-i*dr1;
             if ((rc-rc*A[i][j]*A[i][j]-i*dr1)>0.0){
             //if ((rc-rc*A[i][j]-i*dr1)>0){
-                rho[i][j] = pow(g*2.0/5.0/Kappa,1.5)*pow(diffr,1.5);
+                rho[i][j] = pow(g*2.0/5.0/Kappa,1.5)*pow(rc-rc*A[i][j]*A[i][j]-i*dr1,1.5);
                 Q[i][j] = 32.0*Pi*pow(R,4)*pow(x[i]+a,2)*(1.0-u[j]*u[j])*rho[i][j]*g*rc/pow(Bs*Rp*Rp,2);
                 }
             else{ 
@@ -156,6 +173,7 @@ int main() {
     double e = 0;
     for (int i=1; i< Nr-1; i++) {
       for (int j=1; j< Nu-1; j++){
+         //cout<<e;
          e += pow((A[i][j]-Ac[i][j]),2)/pow(Ac[i][j],2);
       }
     }
@@ -171,6 +189,8 @@ int main() {
         std::cout<<"Exiting loop, solution diverged"<<"\n";
         break;
         }
+          
+    
     counter+=1;
     }
 

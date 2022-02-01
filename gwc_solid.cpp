@@ -1,15 +1,16 @@
-//========================================================================================================================================
+//==========================================================================================
 //
-//   Description: Hollow mound magnetic equilibria models
+//   Description: A C++ program to obtain magnetic mounds (solid mound)
 //                                  
 //   
-//   Version: 3.0 (working version)
+//   Version: 1.0 (working version)
 //   Date: April 2021
 //  
+//          
 //   Author: Ankan Sur
 //   Affiliation: Nicolaus Copernicus Astronomical Center, Warsaw, Poland
 //
-//========================================================================================================================================
+//==========================================================================================
 
 
 #include <iostream>
@@ -24,11 +25,10 @@ using namespace std;
 
 int main() {
 
-
-    int Nr = 257;
-    int Nu = 257;
+    int Nr = 256;
+    int Nu = 256;
     double u[Nu], x[Nr],r[Nr];
-    double rc = 0.12*100.0; //(convert m to cm)
+    double rc = 0.1*100.0; //(convert m to cm)
     double rout = 20*rc; //convert into cm
     double Rs = 1e6;
     double R = 20*rc;
@@ -38,18 +38,17 @@ int main() {
     double M = 1.4*1.989e33;
     double G = 6.67e-8;
     double cs = 1e8;
-    double x0 = R;
+    double x0 = R;//pow(cs*Rs,2)/G/M;
     double a = Rs/R;
     double u_in = 1.0;
     double u_out = sqrt(1-Rs/rA);
     double du = (u_out-u_in)/(Nu-1);
     double dr1 = rc/(Nr/2.0);
     double dr2 = (rout-rc)/(Nr/2.0 -1);
-    double dr = rout/(Nr-1);
     int i,j;
     double A[Nr][Nu],Ac[Nr][Nu],S[Nr][Nu],rho[Nr][Nu],Q[Nr][Nu];
     double e = 100.0;
-    double den,Qp,Qc,Source,w,max1,min1,counter,threshold,dAdr,dAdu,ncounter,diffr;
+    double den,Qp,Qc,Source,w,max1,min1,counter,threshold,dAdr,dAdu,ncounter;
     int rid,uid;
     ofstream outputfile1,outputfile2,outputfile3,outputfile4;
     double Pi = atan(1)*4;
@@ -58,7 +57,7 @@ int main() {
     double Kappa = 5.4e9;
     double f,r0,t1,t2,sinthp,PsiA;
     double Rp = pow(Rs/rA,0.5)*Rs;
-    double dx;
+    double diffr;
     
     //required input parameters
     cout<<"enter threshold =";
@@ -89,11 +88,7 @@ int main() {
         x[i] = (r[i]-Rs)/R;
         }
 
-    /*for (int i=0; i<Nr; i++){ 
-        r[i] = (i*dr+Rs);
-        x[i] = (r[i]-Rs)/R;
-        }*/
-
+    double dx;
     
     outputfile4.open("Source.txt");
     outputfile4<<"Rout\tColatitude_min\tColatitude_max\trc\tRad_min\tRad_max\tAlfven_radius\tPolar_cap_rad\tTh_height\n";
@@ -110,12 +105,12 @@ int main() {
    
    // set boundaries
     for (i=0;i<Nr;i++){
-         A[i][0] = 0.0;
-         A[i][Nu-1] = Rs*Rs*Rs*(1-pow(u[Nu-1],2))/Rp/Rp/r[i]; 
+         A[i][0] = 0.0;//rA*(1-pow(u[Nu-1],2))/(x[i]+a)/x0;
+         A[i][Nu-1] = Rs*Rs*Rs*(1-pow(u[Nu-1],2))/Rp/Rp/r[i]; //rA*(1-pow(u[Nu-1],2))/(x[i]+a)/x0;
          }
     for (j=0;j<Nu;j++){
-        A[0][j] =  Rs*Rs*(1-pow(u[j],2))/Rp/Rp; 
-        A[Nr-1][j] = Rs*Rs*Rs*(1-pow(u[j],2))/Rp/Rp/r[Nr-1]; 
+        A[0][j] =  Rs*Rs*(1-pow(u[j],2))/Rp/Rp; //rA*(1-pow(u[j],2))/(x[0]+a)/x0;
+        A[Nr-1][j] = Rs*Rs*Rs*(1-pow(u[j],2))/Rp/Rp/r[Nr-1]; //rA*(1-pow(u[j],2))/(x[Nr-1]+a)/x0;
     }
     
     outputfile3.open("A0.txt");
@@ -131,26 +126,30 @@ int main() {
  
     auto t_start = std::chrono::high_resolution_clock::now();
 
-    // Starting main loop
-
     while (e>threshold){
+
 
     std::copy(&A[0][0], &A[0][0]+Nr*Nu,&Ac[0][0]);
 
     for (i=1;i<Nr-1;i++){
         dx = x[i+1]-x[i];
         for (j=1;j<Nu-1;j++){
-            diffr = Rs + rc*(0.25-pow(A[i][j]-0.5,2.0))/0.25-r[i];
-            if (diffr>0.0){
+            //r0 = Rs + rc*(1-A[i][j]);
+            //cout<<r0<<"\t";
+            diffr = Rs + rc*(1.0 - A[i][j]*A[i][j])-r[i];
+            //diffr = rc-rc*A[i][j]*A[i][j]-i*dr1;
+            if ((rc-rc*A[i][j]*A[i][j]-i*dr1)>0.0){
+            //if ((rc-rc*A[i][j]-i*dr1)>0){
                 rho[i][j] = pow(g*2.0/5.0/Kappa,1.5)*pow(diffr,1.5);
-                Q[i][j] = 64.0*Pi*pow(R,4)*pow(x[i]+a,2)*(1.0-u[j]*u[j])*rho[i][j]*g*rc/pow(Bs*Rp*Rp,2);
+                Q[i][j] = 32.0*Pi*pow(R,4)*pow(x[i]+a,2)*(1.0-u[j]*u[j])*rho[i][j]*g*rc/pow(Bs*Rp*Rp,2);
                 }
             else{ 
                 rho[i][j] = 0.0;
                 Q[i][j] = 0.0;
                 }
-            den = (2.0/dx/dx + 2.0*(1-u[j]*u[j])/pow(x[i]+a,2.0)/du/du + Q[i][j]*2.0);
-            A[i][j] = (1-w)*Ac[i][j] + w*((A[i+1][j]+A[i-1][j])/dx/dx + (1-u[j]*u[j])*(A[i][j+1]+A[i][j-1])/pow(x[i]+a,2)/du/du + Q[i][j])/den;
+            den = (2.0/dx/dx + 2.0*(1-u[j]*u[j])/pow(x[i]+a,2.0)/du/du + Q[i][j]);
+            //Source = Q[i][j] - Qp*Ac[i][j] + std::max(0.0,Qp)*Ac[i][j];
+            A[i][j] = (1-w)*Ac[i][j] + w*((A[i+1][j]+A[i-1][j])/dx/dx + (1-u[j]*u[j])*(A[i][j+1]+A[i][j-1])/pow(x[i]+a,2)/du/du)/den;
        }
     }
 
@@ -172,8 +171,6 @@ int main() {
         std::cout<<"Exiting loop, solution diverged"<<"\n";
         break;
         }
-          
-    
     counter+=1;
     }
 

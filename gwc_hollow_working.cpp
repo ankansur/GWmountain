@@ -1,6 +1,6 @@
 //========================================================================================================================================
 //
-//   Description: A C++ program to solve the Grad-Shafranov equation to find equilibria models
+//   Description: Hollow mound magnetic equilibria models
 //                                  
 //   
 //   Version: 3.0 (working version)
@@ -28,8 +28,8 @@ int main() {
     int Nr = 128;
     int Nu = 128;
     double u[Nu], x[Nr],r[Nr];
-    double rc = 0.04*100.0; //(convert m to cm)
-    double rout = 100*rc; //convert into cm
+    double rc = 0.12*100.0; //(convert m to cm)
+    double rout = 20*rc; //convert into cm
     double Rs = 1e6;
     double R = 20*rc;
     double Mdot = 6e-13;
@@ -70,7 +70,7 @@ int main() {
     sinthp = sin(Rp/Rs);
     
     //under-relaxation parameter
-    w = 0.1;
+    w = 0.9;
     
     // initialize grid
     for (int j=0; j<Nu; j++){ 
@@ -96,17 +96,6 @@ int main() {
 
     
     outputfile4.open("Source.txt");
-    /*
-    outputfile4<<"Domain above star = "<<rout/100.0<<" m\n";
-    outputfile4<<"printing colatitude range = "<<acos(u[0])*180/Pi<<" to "<<acos(u[Nu-1])*180/Pi<<" degrees"<<"\n";
-    outputfile4<<"printing radial range = "<<r[0]<<" to "<<r[Nr-1]<<" cm"<<"\n";
-    outputfile4<<"printing x range = "<<x[0]<<" to "<<x[Nr-1]<<"\n"; 
-    outputfile4<<"printing a = "<<a<<"\n";
-    outputfile4<<"printing x0 = "<<x0<<" cm\n";
-    outputfile4<<"Alfven radius = "<<rA/1e5<<" km \n";
-    outputfile4<<"Polar cap radius = "<<Rp/1e5<<" km \n";
-    outputfile4<<"Threshold height = "<<54*pow(Bs/1e12,0.41)*pow(Rp/1e5,0.42)<<" m \n";
-    */
     outputfile4<<"Rout\tColatitude_min\tColatitude_max\trc\tRad_min\tRad_max\tAlfven_radius\tPolar_cap_rad\tTh_height\n";
     outputfile4<<rout<<"\t"<<acos(u[0])*180/Pi<<"\t"<<acos(u[Nu-1])*180/Pi<<"\t"<<rc<<"\t"<<r[0]<<"\t"<<r[Nr-1]<<"\t"<<rA<<"\t"<<Rp<<"\t"<<54*pow(Bs/1e12,0.41)*pow(Rp/1e5,0.42)<<"\n";
     outputfile4.close();
@@ -142,15 +131,16 @@ int main() {
  
     auto t_start = std::chrono::high_resolution_clock::now();
 
-    while (e>threshold){
+    // Starting main loop
 
+    while (e>threshold){
 
     std::copy(&A[0][0], &A[0][0]+Nr*Nu,&Ac[0][0]);
 
     for (i=1;i<Nr-1;i++){
         dx = x[i+1]-x[i];
         for (j=1;j<Nu-1;j++){
-            diffr = Rs + rc*(1.0-4.0*A[i][j]*A[i][j])-r[i];
+            diffr = Rs + rc*(0.25-pow(A[i][j]-0.5,2.0))/0.25-r[i];
             if (diffr>0.0){
                 rho[i][j] = pow(g*2.0/5.0/Kappa,1.5)*pow(diffr,1.5);
                 Q[i][j] = 64.0*Pi*pow(R,4)*pow(x[i]+a,2)*(1.0-u[j]*u[j])*rho[i][j]*g*rc/pow(Bs*Rp*Rp,2);
@@ -159,15 +149,14 @@ int main() {
                 rho[i][j] = 0.0;
                 Q[i][j] = 0.0;
                 }
-            den = (2.0/dx/dx + 2.0*(1-u[j]*u[j])/pow(x[i]+a,2.0)/du/du + Q[i][j]);
-            A[i][j] = (1-w)*Ac[i][j] + w*((A[i+1][j]+A[i-1][j])/dx/dx + (1-u[j]*u[j])*(A[i][j+1]+A[i][j-1])/pow(x[i]+a,2)/du/du)/den;
+            den = (2.0/dx/dx + 2.0*(1-u[j]*u[j])/pow(x[i]+a,2.0)/du/du + Q[i][j]*2.0);
+            A[i][j] = (1-w)*Ac[i][j] + w*((A[i+1][j]+A[i-1][j])/dx/dx + (1-u[j]*u[j])*(A[i][j+1]+A[i][j-1])/pow(x[i]+a,2)/du/du + Q[i][j])/den;
        }
     }
 
     double e = 0;
     for (int i=1; i< Nr-1; i++) {
       for (int j=1; j< Nu-1; j++){
-         //cout<<e;
          e += pow((A[i][j]-Ac[i][j]),2)/pow(Ac[i][j],2);
       }
     }
@@ -197,7 +186,7 @@ int main() {
         {
             for (int index= 0; index < Nu; index++)
                
-                outputfile2<<(A[count][index]+0.5)<<" ";  
+                outputfile2<<A[count][index]<<" ";  
             outputfile2<<endl;                          
         }
     outputfile2.close(); 
